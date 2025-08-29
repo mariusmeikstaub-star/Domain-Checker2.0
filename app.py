@@ -11,7 +11,13 @@ st.title("Domain Checker 2.0")
 
 uploaded_file = st.file_uploader("Upload CSV", type="csv")
 if uploaded_file:
-    df = pd.read_csv(uploaded_file, header=None, names=["domain"])
+    # Attempt to read CSV with optional header
+    df = pd.read_csv(uploaded_file)
+    if len(df.columns) != 1 or df.columns[0].strip().lower() != "domain":
+        uploaded_file.seek(0)
+        df = pd.read_csv(uploaded_file, header=None, names=["domain"])
+    else:
+        df = df[["domain"]]
     df = df.dropna(subset=["domain"])
     df["domain"] = df["domain"].astype(str).str.strip()
     df = df[df["domain"] != ""]
