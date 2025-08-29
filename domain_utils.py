@@ -28,10 +28,10 @@ def check_availability(domain):
             logger.info("Checked availability for %s: True", domain)
             return True
         logger.error("Whois lookup failed for %s: %s", domain, e)
-        return True
+        return False
     except Exception as e:
         logger.error("Error checking availability for %s: %s", domain, e)
-        return True
+        return None
 
 def _find_number(data, keys):
     """Return the first numeric value found for any of ``keys`` in ``data``."""
