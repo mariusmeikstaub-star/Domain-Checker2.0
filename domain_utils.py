@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 
@@ -58,73 +57,87 @@ def _parse_number(value):
     return float(s)
 
 
-def _find_number(data, keys):
-    """Return the first numeric value found for any of ``keys`` in ``data``."""
-
-    if isinstance(data, dict):
-        for k, v in data.items():
-            if k in keys and isinstance(v, (int, float, str)):
-                try:
-                    return _parse_number(v)
-                except ValueError:
-                    pass
-            result = _find_number(v, keys)
-            if result is not None:
-                return result
-    elif isinstance(data, list):
-        for item in data:
-            result = _find_number(item, keys)
-            if result is not None:
-                return result
-    return None
-
-
 def get_traffic(domain):
-    """Return estimated monthly visits for *domain* via SimilarWeb."""
+    """Return rough monthly visit estimate for *domain*.
 
-    url = f"https://r.jina.ai/https://www.similarweb.com/website/{domain}/"
+    The function tries two public sources (StatsCrop and Hypestat).  Both
+    provide *daily* visitor numbers which are scaled to a monthly value.  If
+    neither source yields a result ``0`` is returned instead of ``"N/A"`` so
+    callers always receive a number.
+    """
+
     headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        status = r.status_code
-        logger.info("SimilarWeb HTML response for %s: %s", domain, status)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        script = soup.find("script", id="__NEXT_DATA__")
-        if script and script.string:
-            data = json.loads(script.string)
-            visits = _find_number(
-                data, {"visits", "estimatedVisits", "visitsValue", "totalVisits"}
-            )
-            if visits is not None:
-                visits = int(visits)
-                logger.info("Fetched traffic for %s: %s", domain, visits)
-                return visits
-        logger.warning("Could not parse traffic data for %s", domain)
-    except Exception as e:
-        logger.error("Error fetching traffic for %s: %s", domain, e)
-    logger.info("Returning 'N/A' for traffic of %s", domain)
-    return "N/A"
+
+    def _from_text(text):
+        match = re.search(r"Daily\s+Visitors[^0-9]*([0-9.,]+)", text, re.I)
+        if not match:
+            match = re.search(r"Daily\s+Pageviews[^0-9]*([0-9.,]+)", text, re.I)
+        if match:
+            return int(_parse_number(match.group(1)) * 30)
+        return None
+
+    sources = [
+        ("StatsCrop", f"https://www.statscrop.com/www/{domain}"),
+        ("Hypestat", f"https://hypestat.com/info/{domain}"),
+    ]
+
+    for name, url in sources:
+        try:
+            r = requests.get(url, headers=headers, timeout=10)
+            logger.info("%s response for %s: %s", name, domain, r.status_code)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
+            monthly = _from_text(soup.get_text(" ", strip=True))
+            if monthly is not None:
+                logger.info("Fetched traffic for %s via %s: %s", domain, name, monthly)
+                return monthly
+            logger.warning("Could not parse traffic data for %s via %s", domain, name)
+        except Exception as e:
+            logger.error("Error fetching traffic for %s via %s: %s", domain, name, e)
+
+    logger.info("Returning 0 for traffic of %s", domain)
+    return 0
 
 def get_backlinks(domain):
-    """Return number of backlinks for *domain* via OpenLinkProfiler."""
+    """Return number of backlinks for *domain*.
 
-    url = f"https://r.jina.ai/https://openlinkprofiler.org/r/{domain}"
+    A small count is obtained from HackerTarget's free API.  If that request
+    fails or yields an error message the function falls back to scraping
+    OpenLinkProfiler.  Should both approaches fail ``0`` is returned.
+    """
+
     headers = {"User-Agent": "Mozilla/5.0"}
+
+    # HackerTarget returns up to ten backlinks, one per line
     try:
+        url = f"https://api.hackertarget.com/backlinks/?q={domain}"
         r = requests.get(url, headers=headers, timeout=10)
-        status = r.status_code
-        logger.info("OpenLinkProfiler HTML response for %s: %s", domain, status)
+        logger.info("HackerTarget backlinks response for %s: %s", domain, r.status_code)
+        r.raise_for_status()
+        lines = [line for line in r.text.splitlines() if line.strip()]
+        if lines and not lines[0].lower().startswith("error"):
+            backlinks = len(lines)
+            logger.info("Fetched backlinks for %s via HackerTarget: %s", domain, backlinks)
+            return backlinks
+    except Exception as e:
+        logger.error("Error fetching backlinks for %s via HackerTarget: %s", domain, e)
+
+    # Fallback: scrape OpenLinkProfiler summary page
+    try:
+        url = f"https://www.openlinkprofiler.org/r/{domain}"
+        r = requests.get(url, headers=headers, timeout=10)
+        logger.info("OpenLinkProfiler response for %s: %s", domain, r.status_code)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
         text = soup.get_text(" ", strip=True)
-        match = re.search(r"Backlinks[^0-9]*([0-9.,]+)", text)
+        match = re.search(r"Backlinks[^0-9]*([0-9.,]+)", text, re.I)
         if match:
             backlinks = int(_parse_number(match.group(1)))
-            logger.info("Fetched backlinks for %s: %s", domain, backlinks)
+            logger.info("Fetched backlinks for %s via OpenLinkProfiler: %s", domain, backlinks)
             return backlinks
-        logger.warning("Could not parse backlinks for %s", domain)
+        logger.warning("Could not parse backlinks for %s via OpenLinkProfiler", domain)
     except Exception as e:
-        logger.error("Error fetching backlinks for %s: %s", domain, e)
-    logger.info("Returning 'N/A' for backlinks of %s", domain)
-    return "N/A"
+        logger.error("Error fetching backlinks for %s via OpenLinkProfiler: %s", domain, e)
+
+    logger.info("Returning 0 for backlinks of %s", domain)
+    return 0

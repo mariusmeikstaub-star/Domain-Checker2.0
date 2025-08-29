@@ -34,11 +34,11 @@ example.org
 
 ## Datenquellen
 
-- **Traffic**: Scraping der öffentlichen SimilarWeb-Seite über eine einfache HTTP-Anfrage.
-- **Backlinks**: Scraping der öffentlichen Daten auf OpenLinkProfiler per HTTP-Anfrage.
+- **Traffic**: Scraping der Seite [StatsCrop](https://www.statscrop.com/) mit Fallback auf [Hypestat](https://hypestat.com/) und Auslesen der dort angegebenen "Daily Visitors" (hochgerechnet auf den Monat).
+- **Backlinks**: Abfrage der freien API von [HackerTarget](https://api.hackertarget.com/backlinks/) mit Fallback auf [OpenLinkProfiler](https://www.openlinkprofiler.org/) und Zählen der zurückgegebenen Links.
 - **Verfügbarkeit**: Whois-Abfrage über das Python-Paket `python-whois`.
 
-Für alle Anfragen sind keine API-Schlüssel nötig. Kann ein Wert nicht ermittelt werden, erscheint `N/A`.
+Für alle Anfragen sind keine API-Schlüssel nötig. Kann kein Wert ermittelt werden, wird `0` zurückgegeben.
 
 ## Logging
 
