@@ -1,9 +1,11 @@
-import whois
-import requests
-import os
+import json
 import logging
+import re
+
+import requests
+import whois
+from bs4 import BeautifulSoup
 from whois.parser import PywhoisError
-from urllib3.exceptions import NameResolutionError
 
 # Configure a basic logger that writes to ``domain_checker.log``.
 logger = logging.getLogger("domain_checker")
@@ -30,126 +32,81 @@ def check_availability(domain):
         logger.error("Error checking availability for %s: %s", domain, e)
         return True
 
-def get_traffic(domain):
-    """Return estimated visits for *domain*.
+def _find_number(data, keys):
+    """Return the first numeric value found for any of ``keys`` in ``data``."""
 
-    Versucht zunächst, die SimilarWeb-API mit einem API-Key zu nutzen. Sollte kein
-    Schlüssel vorhanden sein oder die Abfrage fehlschlagen, wird als Fallback
-    die öffentliche SimilarWeb-Datenquelle verwendet. Führen beide Versuche zu
-    keinem Ergebnis, wird ``"N/A"`` zurückgegeben.
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if k in keys and isinstance(v, (int, float, str)):
+                try:
+                    return float(str(v).replace(",", "").replace(".", ""))
+                except ValueError:
+                    pass
+            result = _find_number(v, keys)
+            if result is not None:
+                return result
+    elif isinstance(data, list):
+        for item in data:
+            result = _find_number(item, keys)
+            if result is not None:
+                return result
+    return None
+
+
+def get_traffic(domain):
+    """Return estimated monthly visits for *domain*.
+
+    Die Funktion ruft die öffentliche SimilarWeb-Seite auf und extrahiert den
+    Traffic-Wert aus den eingebetteten JSON-Daten. Ein API-Key ist nicht
+    erforderlich. Bei Fehlern wird ``"N/A"`` zurückgegeben.
     """
 
-    api_key = os.getenv("SIMILARWEB_API_KEY")
-    if api_key:
-        url = (
-            f"https://api.similarweb.com/v1/website/{domain}/traffic-and-engagement/visits"
-            f"?api_key={api_key}&country=world"
-        )
-        try:
-            r = requests.get(url, timeout=10)
-            logger.info("SimilarWeb API response for %s: %s", domain, r.status_code)
-            r.raise_for_status()
-            data = r.json()
-            visits = data.get("visits")
-            if isinstance(visits, dict):
-                total = sum(visits.values())
-                logger.info("Fetched traffic for %s: %s", domain, total)
-                return total
-        except Exception as e:
-            logger.exception(
-                "Error fetching traffic for %s via SimilarWeb API: %s", domain, e
-            )
-
-    fallback_url = f"https://data.similarweb.com/api/v1/data?domain={domain}"
+    url = f"https://www.similarweb.com/website/{domain}/"
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        r = requests.get(fallback_url, timeout=10)
-        logger.info(
-            "SimilarWeb public API response for %s: %s", domain, r.status_code
-        )
-        if r.status_code == 403:
-            logger.warning(
-                "Public SimilarWeb API returned 403 for %s - API key required or access denied",
-                domain,
+        r = requests.get(url, headers=headers, timeout=10)
+        logger.info("SimilarWeb HTML response for %s: %s", domain, r.status_code)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        script = soup.find("script", id="__NEXT_DATA__")
+        if script and script.string:
+            data = json.loads(script.string)
+            visits = _find_number(
+                data, {"visits", "estimatedVisits", "visitsValue", "totalVisits"}
             )
-        else:
-            r.raise_for_status()
-            data = r.json()
-            visits = data.get("EstimatedMonthlyVisits")
-            if isinstance(visits, dict):
-                total = sum(visits.values())
-                logger.info("Fetched traffic for %s via fallback: %s", domain, total)
-                return total
-    except requests.exceptions.RequestException as e:
-        logger.error(
-            "Error fetching traffic for %s via public SimilarWeb API: %s", domain, e
-        )
+            if visits:
+                visits = int(visits)
+                logger.info("Fetched traffic for %s: %s", domain, visits)
+                return visits
+        logger.warning("Could not parse traffic data for %s", domain)
+    except Exception as e:
+        logger.error("Error fetching traffic for %s: %s", domain, e)
     logger.info("Returning 'N/A' for traffic of %s", domain)
     return "N/A"
 
 def get_backlinks(domain):
-    """Return number of referring domains for *domain*.
+    """Return number of backlinks for *domain*.
 
-    Primär wird die Open-Page-Rank-API verwendet. Fehlt der API-Key oder ist
-    keine Antwort verfügbar, greift die Funktion auf die offene
-    OpenLinkProfiler-API zurück.
+    Die Funktion nutzt die öffentliche Website von OpenLinkProfiler und parst
+    die dort angezeigte Gesamtzahl der Backlinks. Ein API-Key ist nicht nötig.
+    Bei Fehlern wird ``"N/A"`` zurückgegeben.
     """
 
-    api_key = os.getenv("OPR_API_KEY")
-    if api_key:
-        url = (
-            f"https://openpagerank.com/api/v1.0/getPageRank?domains%5B0%5D={domain}"
-        )
-        headers = {"API-OPR": api_key}
-        try:
-            r = requests.get(url, headers=headers, timeout=10)
-            logger.info("Open Page Rank response for %s: %s", domain, r.status_code)
-            r.raise_for_status()
-            data = r.json()
-            response = data.get("response", [])
-            if response:
-                referring = response[0].get("referring_domains")
-                if referring is not None:
-                    logger.info("Fetched backlinks for %s: %s", domain, referring)
-                    return referring
-        except Exception as e:
-            logger.exception(
-                "Error fetching backlinks for %s via Open Page Rank: %s", domain, e
-            )
-
-    fallback_url = (
-        f"https://api.openlinkprofiler.org/summary?domain={domain}&format=json"
-    )
+    url = f"https://openlinkprofiler.org/r/{domain}"
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        r = requests.get(fallback_url, timeout=10)
-        logger.info(
-            "OpenLinkProfiler response for %s: %s", domain, r.status_code
-        )
+        r = requests.get(url, headers=headers, timeout=10)
+        logger.info("OpenLinkProfiler HTML response for %s: %s", domain, r.status_code)
         r.raise_for_status()
-        data = r.json()
-        backlinks = (
-            data.get("summary", {}).get("backlinks")
-            or data.get("response", {}).get("summary", {}).get("backlinks")
-            or data.get("backlinks")
-        )
-        if backlinks is not None:
-            logger.info(
-                "Fetched backlinks for %s via fallback: %s", domain, backlinks
-            )
+        soup = BeautifulSoup(r.text, "html.parser")
+        text = soup.get_text(" ", strip=True)
+        match = re.search(r"Backlinks[^0-9]*([0-9.,]+)", text)
+        if match:
+            backlinks = int(match.group(1).replace(".", "").replace(",", ""))
+            logger.info("Fetched backlinks for %s: %s", domain, backlinks)
             return backlinks
-    except requests.exceptions.ConnectionError as e:
-        if isinstance(getattr(e, "__cause__", None), NameResolutionError):
-            logger.error(
-                "DNS resolution failed for OpenLinkProfiler while checking %s", domain
-            )
-        else:
-            logger.error(
-                "Connection error fetching backlinks for %s via OpenLinkProfiler: %s",
-                domain,
-                e,
-            )
-    except requests.exceptions.RequestException as e:
-        logger.error(
-            "Error fetching backlinks for %s via OpenLinkProfiler: %s", domain, e
-        )
+        logger.warning("Could not parse backlinks for %s", domain)
+    except Exception as e:
+        logger.error("Error fetching backlinks for %s: %s", domain, e)
     logger.info("Returning 'N/A' for backlinks of %s", domain)
     return "N/A"
