@@ -34,12 +34,12 @@ example.org
 
 ## Datenquellen
 
-Traffic- und Backlinkwerte werden automatisch aus frei zugänglichen
-Webseiten ermittelt – es sind keine API-Schlüssel notwendig. Für jede
-Domain wird die entsprechende SimilarWeb- und OpenLinkProfiler-Seite
-über [cloudscraper](https://pypi.org/project/cloudscraper/) abgerufen
-und der dort angezeigte Wert ausgelesen. Kann ein Wert nicht
-ermittelt werden, erscheint `N/A`.
+- **Traffic**: Anzahl der in der aktuellen [Common Crawl](https://commoncrawl.org) enthaltenen Seiten des jeweiligen Hosts.
+- **Backlinks**: Anzahl verweisender Domains aus dem öffentlichen [Common Crawl Web Graph](https://webgraph.cc).
+- **Verfügbarkeit**: Abfrage der [RDAP](https://datatracker.ietf.org/doc/html/rfc9083)-Schnittstelle.
+
+Für alle Anfragen sind keine API-Schlüssel nötig. Kann ein Wert nicht ermittelt
+werden, erscheint `N/A`.
 
 ## Logging
 

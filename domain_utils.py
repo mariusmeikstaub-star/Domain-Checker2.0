@@ -2,10 +2,7 @@ import json
 import logging
 import re
 
-import whois
-import cloudscraper
-from bs4 import BeautifulSoup
-from whois.parser import PywhoisError
+import requests
 
 # Configure a basic logger that writes to ``domain_checker.log``.
 logger = logging.getLogger("domain_checker")
@@ -17,20 +14,20 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 def check_availability(domain):
+    """Return ``True`` if *domain* is unregistered using RDAP."""
+
+    url = f"https://rdap.org/domain/{domain}"
     try:
-        w = whois.whois(domain)
-        available = w.domain_name is None
-        logger.info("Checked availability for %s: %s", domain, available)
-        return available
-    except PywhoisError as e:
-        if "Status: free" in str(e):
-            logger.info("Checked availability for %s: True", domain)
+        r = requests.get(url, timeout=10)
+        logger.info("RDAP response for %s: %s", domain, r.status_code)
+        if r.status_code == 404:
             return True
-        logger.error("Whois lookup failed for %s: %s", domain, e)
-        return False
+        if r.ok:
+            return False
+        logger.error("Unexpected RDAP status for %s: %s", domain, r.status_code)
     except Exception as e:
-        logger.error("Error checking availability for %s: %s", domain, e)
-        return None
+        logger.error("Error checking availability for %s via RDAP: %s", domain, e)
+    return None
 
 def _parse_number(value):
     """Return ``value`` as ``float`` while respecting thousand separators.
@@ -79,57 +76,37 @@ def _find_number(data, keys):
 
 
 def get_traffic(domain):
-    """Return estimated monthly visits for *domain*.
+    """Return an estimate of the number of pages for *domain* in Common Crawl."""
 
-    Die Funktion ruft die öffentliche SimilarWeb-Seite auf und extrahiert den
-    Traffic-Wert aus den eingebetteten JSON-Daten. Ein API-Key ist nicht
-    erforderlich. Bei Fehlern wird ``"N/A"`` zurückgegeben.
-    """
-
-    url = f"https://www.similarweb.com/website/{domain}/"
-    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        scraper = cloudscraper.create_scraper()
-        r = scraper.get(url, headers=headers, timeout=10)
-        logger.info("SimilarWeb HTML response for %s: %s", domain, r.status_code)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        script = soup.find("script", id="__NEXT_DATA__")
-        if script and script.string:
-            data = json.loads(script.string)
-            visits = _find_number(
-                data, {"visits", "estimatedVisits", "visitsValue", "totalVisits"}
-            )
-            if visits:
-                visits = int(visits)
-                logger.info("Fetched traffic for %s: %s", domain, visits)
-                return visits
-        logger.warning("Could not parse traffic data for %s", domain)
+        collinfo = requests.get("https://index.commoncrawl.org/collinfo.json", timeout=10).json()
+        latest = collinfo[0]["id"]
+        url = f"https://index.commoncrawl.org/{latest}-index?url={domain}&output=json"
+        r = requests.get(url, timeout=10)
+        logger.info("CommonCrawl index response for %s: %s", domain, r.status_code)
+        if r.ok:
+            lines = [line for line in r.text.splitlines() if line.strip()]
+            visits = len(lines)
+            logger.info("Fetched traffic for %s: %s", domain, visits)
+            return visits
     except Exception as e:
-        logger.error("Error fetching traffic for %s: %s", domain, e)
+        logger.error("Error fetching traffic for %s via CommonCrawl: %s", domain, e)
     logger.info("Returning 'N/A' for traffic of %s", domain)
     return "N/A"
 
 def get_backlinks(domain):
-    """Return number of backlinks for *domain*.
+    """Return number of referring domains for *domain* using Web Graph."""
 
-    Die Funktion nutzt die öffentliche Website von OpenLinkProfiler und parst
-    die dort angezeigte Gesamtzahl der Backlinks. Ein API-Key ist nicht nötig.
-    Bei Fehlern wird ``"N/A"`` zurückgegeben.
-    """
-
-    url = f"https://openlinkprofiler.org/r/{domain}"
+    url = f"https://webgraph.cc/api/graph?url={domain}"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        scraper = cloudscraper.create_scraper()
-        r = scraper.get(url, headers=headers, timeout=10)
-        logger.info("OpenLinkProfiler HTML response for %s: %s", domain, r.status_code)
+        r = requests.get(url, headers=headers, timeout=10)
+        logger.info("WebGraph API response for %s: %s", domain, r.status_code)
         r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        text = soup.get_text(" ", strip=True)
-        match = re.search(r"Backlinks[^0-9]*([0-9.,]+)", text)
-        if match:
-            backlinks = int(match.group(1).replace(".", "").replace(",", ""))
+        data = r.json()
+        backlinks = _find_number(data, {"inlinks", "inbound", "inbound_count", "inCount"})
+        if backlinks is not None:
+            backlinks = int(backlinks)
             logger.info("Fetched backlinks for %s: %s", domain, backlinks)
             return backlinks
         logger.warning("Could not parse backlinks for %s", domain)
