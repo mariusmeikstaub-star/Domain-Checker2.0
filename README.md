@@ -15,8 +15,9 @@ Backlinks auf sie verweisen.
 ## API-Keys und Fallbacks
 
 Für die Abfragen von Traffic und Backlinks werden nach Möglichkeit
-API-Schlüssel verwendet. Setzen Sie vor dem Start folgende
-Umgebungsvariablen, falls verfügbar:
+API-Schlüssel verwendet. Sie sind optional – ohne Schlüssel
+erhalten Sie gegebenenfalls `N/A` als Ergebnis. Setzen Sie vor dem
+Start folgende Umgebungsvariablen, falls verfügbar:
 
 * `SIMILARWEB_API_KEY` – Traffic-Abfrage über die SimilarWeb-API
 * `OPR_API_KEY` – Backlink-Abfrage über [Open Page Rank](https://www.openpagerank.com/)

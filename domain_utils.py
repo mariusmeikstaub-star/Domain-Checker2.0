@@ -2,6 +2,8 @@ import whois
 import requests
 import os
 import logging
+from whois.parser import PywhoisError
+from urllib3.exceptions import NameResolutionError
 
 # Configure a basic logger that writes to ``domain_checker.log``.
 logger = logging.getLogger("domain_checker")
@@ -18,8 +20,14 @@ def check_availability(domain):
         available = w.domain_name is None
         logger.info("Checked availability for %s: %s", domain, available)
         return available
+    except PywhoisError as e:
+        if "Status: free" in str(e):
+            logger.info("Checked availability for %s: True", domain)
+            return True
+        logger.error("Whois lookup failed for %s: %s", domain, e)
+        return True
     except Exception as e:
-        logger.exception("Error checking availability for %s: %s", domain, e)
+        logger.error("Error checking availability for %s: %s", domain, e)
         return True
 
 def get_traffic(domain):
@@ -58,15 +66,21 @@ def get_traffic(domain):
         logger.info(
             "SimilarWeb public API response for %s: %s", domain, r.status_code
         )
-        r.raise_for_status()
-        data = r.json()
-        visits = data.get("EstimatedMonthlyVisits")
-        if isinstance(visits, dict):
-            total = sum(visits.values())
-            logger.info("Fetched traffic for %s via fallback: %s", domain, total)
-            return total
-    except Exception as e:
-        logger.exception(
+        if r.status_code == 403:
+            logger.warning(
+                "Public SimilarWeb API returned 403 for %s - API key required or access denied",
+                domain,
+            )
+        else:
+            r.raise_for_status()
+            data = r.json()
+            visits = data.get("EstimatedMonthlyVisits")
+            if isinstance(visits, dict):
+                total = sum(visits.values())
+                logger.info("Fetched traffic for %s via fallback: %s", domain, total)
+                return total
+    except requests.exceptions.RequestException as e:
+        logger.error(
             "Error fetching traffic for %s via public SimilarWeb API: %s", domain, e
         )
     logger.info("Returning 'N/A' for traffic of %s", domain)
@@ -122,8 +136,19 @@ def get_backlinks(domain):
                 "Fetched backlinks for %s via fallback: %s", domain, backlinks
             )
             return backlinks
-    except Exception as e:
-        logger.exception(
+    except requests.exceptions.ConnectionError as e:
+        if isinstance(getattr(e, "__cause__", None), NameResolutionError):
+            logger.error(
+                "DNS resolution failed for OpenLinkProfiler while checking %s", domain
+            )
+        else:
+            logger.error(
+                "Connection error fetching backlinks for %s via OpenLinkProfiler: %s",
+                domain,
+                e,
+            )
+    except requests.exceptions.RequestException as e:
+        logger.error(
             "Error fetching backlinks for %s via OpenLinkProfiler: %s", domain, e
         )
     logger.info("Returning 'N/A' for backlinks of %s", domain)
