@@ -16,9 +16,9 @@ if uploaded_file:
     total = len(df)
     for idx, domain in enumerate(df["domain"], start=1):
         status_placeholder.text(f"Checking {idx}/{total}: {domain}")
-        available = check_availability(domain)
         traffic = get_traffic(domain)
         backlinks = get_backlinks(domain)
+        available = check_availability(domain)
         results.append({
             "domain": domain,
             "available": available,
@@ -26,7 +26,7 @@ if uploaded_file:
             "backlinks": backlinks,
         })
         progress.progress(idx / total)
-    result_df = pd.DataFrame(results)
+    result_df = pd.DataFrame(results).fillna("N/A")
     st.dataframe(result_df)
     csv = result_df.to_csv(index=False).encode("utf-8")
     st.download_button("Download Results CSV", data=csv, file_name="domain_results.csv", mime="text/csv")

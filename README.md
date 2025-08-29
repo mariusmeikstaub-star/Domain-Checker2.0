@@ -20,4 +20,4 @@ Setzen Sie vor dem Start folgende Umgebungsvariablen, falls verfügbar:
 * `SIMILARWEB_API_KEY` – Traffic-Abfrage
 * `OPR_API_KEY` – Backlink-Abfrage über [Open Page Rank](https://www.openpagerank.com/)
 
-Sind keine API-Schlüssel gesetzt, werden für die jeweiligen Felder `None` zurückgegeben.
+Sind keine API-Schlüssel gesetzt oder sind keine Daten verfügbar, werden für die jeweiligen Felder `N/A` zurückgegeben.
