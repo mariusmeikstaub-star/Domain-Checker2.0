@@ -2,7 +2,10 @@ import json
 import logging
 import re
 
-import requests
+import whois
+from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
+from whois.parser import PywhoisError
 
 # Configure a basic logger that writes to ``domain_checker.log``.
 logger = logging.getLogger("domain_checker")
@@ -14,19 +17,20 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 def check_availability(domain):
-    """Return ``True`` if *domain* is unregistered using RDAP."""
+    """Return ``True`` if *domain* is unregistered using Whois."""
 
-    url = f"https://rdap.org/domain/{domain}"
     try:
-        r = requests.get(url, timeout=10)
-        logger.info("RDAP response for %s: %s", domain, r.status_code)
-        if r.status_code == 404:
+        w = whois.whois(domain)
+        available = w.domain_name is None
+        logger.info("Checked availability for %s: %s", domain, available)
+        return available
+    except PywhoisError as e:
+        if "free" in str(e).lower():
+            logger.info("Checked availability for %s: True", domain)
             return True
-        if r.ok:
-            return False
-        logger.error("Unexpected RDAP status for %s: %s", domain, r.status_code)
+        logger.error("Whois lookup failed for %s: %s", domain, e)
     except Exception as e:
-        logger.error("Error checking availability for %s via RDAP: %s", domain, e)
+        logger.error("Error checking availability for %s: %s", domain, e)
     return None
 
 def _parse_number(value):
@@ -76,40 +80,51 @@ def _find_number(data, keys):
 
 
 def get_traffic(domain):
-    """Return an estimate of the number of pages for *domain* in Common Crawl."""
+    """Return estimated monthly visits for *domain* via SimilarWeb."""
 
+    url = f"https://www.similarweb.com/website/{domain}/"
     try:
-        collinfo = requests.get("https://index.commoncrawl.org/collinfo.json", timeout=10).json()
-        latest = collinfo[0]["id"]
-        url = f"https://index.commoncrawl.org/{latest}-index?url={domain}&output=json"
-        r = requests.get(url, timeout=10)
-        logger.info("CommonCrawl index response for %s: %s", domain, r.status_code)
-        if r.ok:
-            lines = [line for line in r.text.splitlines() if line.strip()]
-            visits = len(lines)
-            logger.info("Fetched traffic for %s: %s", domain, visits)
-            return visits
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            response = page.goto(url, timeout=10000)
+            status = response.status if response else "N/A"
+            logger.info("SimilarWeb HTML response for %s: %s", domain, status)
+            script = page.locator("script#__NEXT_DATA__")
+            if script.count() > 0:
+                data = json.loads(script.first.inner_text())
+                visits = _find_number(
+                    data, {"visits", "estimatedVisits", "visitsValue", "totalVisits"}
+                )
+                if visits is not None:
+                    visits = int(visits)
+                    logger.info("Fetched traffic for %s: %s", domain, visits)
+                    return visits
+            logger.warning("Could not parse traffic data for %s", domain)
     except Exception as e:
-        logger.error("Error fetching traffic for %s via CommonCrawl: %s", domain, e)
+        logger.error("Error fetching traffic for %s: %s", domain, e)
     logger.info("Returning 'N/A' for traffic of %s", domain)
     return "N/A"
 
 def get_backlinks(domain):
-    """Return number of referring domains for *domain* using Web Graph."""
+    """Return number of backlinks for *domain* via OpenLinkProfiler."""
 
-    url = f"https://webgraph.cc/api/graph?url={domain}"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    url = f"https://openlinkprofiler.org/r/{domain}"
     try:
-        r = requests.get(url, headers=headers, timeout=10)
-        logger.info("WebGraph API response for %s: %s", domain, r.status_code)
-        r.raise_for_status()
-        data = r.json()
-        backlinks = _find_number(data, {"inlinks", "inbound", "inbound_count", "inCount"})
-        if backlinks is not None:
-            backlinks = int(backlinks)
-            logger.info("Fetched backlinks for %s: %s", domain, backlinks)
-            return backlinks
-        logger.warning("Could not parse backlinks for %s", domain)
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            response = page.goto(url, timeout=10000)
+            status = response.status if response else "N/A"
+            logger.info("OpenLinkProfiler HTML response for %s: %s", domain, status)
+            soup = BeautifulSoup(page.content(), "html.parser")
+            text = soup.get_text(" ", strip=True)
+            match = re.search(r"Backlinks[^0-9]*([0-9.,]+)", text)
+            if match:
+                backlinks = int(_parse_number(match.group(1)))
+                logger.info("Fetched backlinks for %s: %s", domain, backlinks)
+                return backlinks
+            logger.warning("Could not parse backlinks for %s", domain)
     except Exception as e:
         logger.error("Error fetching backlinks for %s: %s", domain, e)
     logger.info("Returning 'N/A' for backlinks of %s", domain)
