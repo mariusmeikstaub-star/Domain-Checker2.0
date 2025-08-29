@@ -25,16 +25,22 @@ if uploaded_file:
         traffic = get_traffic(domain)
         backlinks = get_backlinks(domain)
         available = check_availability(domain)
+        if available is None:
+            availability_status = "unbekannt"
+        elif available:
+            availability_status = "frei"
+        else:
+            availability_status = "vergeben"
         logger.info(
             "Finished %s: available=%s, traffic=%s, backlinks=%s",
             domain,
-            available,
+            availability_status,
             traffic,
             backlinks,
         )
         results.append({
             "domain": domain,
-            "available": available,
+            "available": availability_status,
             "traffic": traffic,
             "backlinks": backlinks,
         })
