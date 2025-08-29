@@ -3,8 +3,8 @@ import logging
 import re
 
 import whois
+import requests
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 from whois.parser import PywhoisError
 
 # Configure a basic logger that writes to ``domain_checker.log``.
@@ -82,25 +82,25 @@ def _find_number(data, keys):
 def get_traffic(domain):
     """Return estimated monthly visits for *domain* via SimilarWeb."""
 
-    url = f"https://www.similarweb.com/website/{domain}/"
+    url = f"https://r.jina.ai/https://www.similarweb.com/website/{domain}/"
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            response = page.goto(url, timeout=10000)
-            status = response.status if response else "N/A"
-            logger.info("SimilarWeb HTML response for %s: %s", domain, status)
-            script = page.locator("script#__NEXT_DATA__")
-            if script.count() > 0:
-                data = json.loads(script.first.inner_text())
-                visits = _find_number(
-                    data, {"visits", "estimatedVisits", "visitsValue", "totalVisits"}
-                )
-                if visits is not None:
-                    visits = int(visits)
-                    logger.info("Fetched traffic for %s: %s", domain, visits)
-                    return visits
-            logger.warning("Could not parse traffic data for %s", domain)
+        r = requests.get(url, headers=headers, timeout=10)
+        status = r.status_code
+        logger.info("SimilarWeb HTML response for %s: %s", domain, status)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        script = soup.find("script", id="__NEXT_DATA__")
+        if script and script.string:
+            data = json.loads(script.string)
+            visits = _find_number(
+                data, {"visits", "estimatedVisits", "visitsValue", "totalVisits"}
+            )
+            if visits is not None:
+                visits = int(visits)
+                logger.info("Fetched traffic for %s: %s", domain, visits)
+                return visits
+        logger.warning("Could not parse traffic data for %s", domain)
     except Exception as e:
         logger.error("Error fetching traffic for %s: %s", domain, e)
     logger.info("Returning 'N/A' for traffic of %s", domain)
@@ -109,22 +109,21 @@ def get_traffic(domain):
 def get_backlinks(domain):
     """Return number of backlinks for *domain* via OpenLinkProfiler."""
 
-    url = f"https://openlinkprofiler.org/r/{domain}"
+    url = f"https://r.jina.ai/https://openlinkprofiler.org/r/{domain}"
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            response = page.goto(url, timeout=10000)
-            status = response.status if response else "N/A"
-            logger.info("OpenLinkProfiler HTML response for %s: %s", domain, status)
-            soup = BeautifulSoup(page.content(), "html.parser")
-            text = soup.get_text(" ", strip=True)
-            match = re.search(r"Backlinks[^0-9]*([0-9.,]+)", text)
-            if match:
-                backlinks = int(_parse_number(match.group(1)))
-                logger.info("Fetched backlinks for %s: %s", domain, backlinks)
-                return backlinks
-            logger.warning("Could not parse backlinks for %s", domain)
+        r = requests.get(url, headers=headers, timeout=10)
+        status = r.status_code
+        logger.info("OpenLinkProfiler HTML response for %s: %s", domain, status)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        text = soup.get_text(" ", strip=True)
+        match = re.search(r"Backlinks[^0-9]*([0-9.,]+)", text)
+        if match:
+            backlinks = int(_parse_number(match.group(1)))
+            logger.info("Fetched backlinks for %s: %s", domain, backlinks)
+            return backlinks
+        logger.warning("Could not parse backlinks for %s", domain)
     except Exception as e:
         logger.error("Error fetching backlinks for %s: %s", domain, e)
     logger.info("Returning 'N/A' for backlinks of %s", domain)

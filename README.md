@@ -7,8 +7,7 @@ Backlinks auf sie verweisen.
 ## Nutzung
 
 1. Erstellen Sie eine CSV-Datei mit einer Domain pro Zeile. Optional kann die erste Zeile eine Kopfzeile `domain` enthalten.
-2. Doppelklicken Sie unter Windows auf `start.bat`. Beim ersten Start lädt
-   Playwright einen Browser herunter.
+2. Doppelklicken Sie unter Windows auf `start.bat`. Es wird eine virtuelle Umgebung eingerichtet, die Abhängigkeiten installiert und die Anwendung gestartet.
 3. Laden Sie die CSV-Datei über die Benutzeroberfläche hoch.
 4. Warten Sie, bis alle Domains geprüft wurden. Der Fortschritt wird angezeigt.
 5. Laden Sie das Ergebnis als CSV-Datei herunter.
@@ -35,15 +34,11 @@ example.org
 
 ## Datenquellen
 
-- **Traffic**: Scraping der öffentlichen SimilarWeb-Seite mit einem Headless-
-  Browser (Playwright).
-- **Backlinks**: Scraping der öffentlichen Daten auf OpenLinkProfiler mit
-  Playwright.
+- **Traffic**: Scraping der öffentlichen SimilarWeb-Seite über eine einfache HTTP-Anfrage.
+- **Backlinks**: Scraping der öffentlichen Daten auf OpenLinkProfiler per HTTP-Anfrage.
 - **Verfügbarkeit**: Whois-Abfrage über das Python-Paket `python-whois`.
 
-Für alle Anfragen sind keine API-Schlüssel nötig. Da die Seiten JavaScript
-verwenden, wird beim ersten Start automatisch der Playwright-Browser
-installiert. Kann ein Wert nicht ermittelt werden, erscheint `N/A`.
+Für alle Anfragen sind keine API-Schlüssel nötig. Kann ein Wert nicht ermittelt werden, erscheint `N/A`.
 
 ## Logging
 
