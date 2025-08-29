@@ -7,12 +7,14 @@ st.title("Domain Checker 2.0")
 uploaded_file = st.file_uploader("Upload CSV", type="csv")
 if uploaded_file:
     df = pd.read_csv(uploaded_file, header=None, names=["domain"])
+    df = df.dropna(subset=["domain"])
+    df["domain"] = df["domain"].astype(str).str.strip()
+    df = df[df["domain"] != ""]
     results = []
     progress = st.progress(0)
     status_placeholder = st.empty()
     total = len(df)
-    for idx, row in enumerate(df.itertuples(), start=1):
-        domain = row.domain.strip()
+    for idx, domain in enumerate(df["domain"], start=1):
         status_placeholder.text(f"Checking {idx}/{total}: {domain}")
         available = check_availability(domain)
         traffic = get_traffic(domain)
@@ -23,7 +25,7 @@ if uploaded_file:
             "traffic": traffic,
             "backlinks": backlinks,
         })
-        progress.progress(idx/total)
+        progress.progress(idx / total)
     result_df = pd.DataFrame(results)
     st.dataframe(result_df)
     csv = result_df.to_csv(index=False).encode("utf-8")
