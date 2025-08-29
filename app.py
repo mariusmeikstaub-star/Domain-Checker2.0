@@ -1,6 +1,11 @@
 import streamlit as st
 import pandas as pd
-from domain_utils import check_availability, get_traffic, get_backlinks
+from domain_utils import (
+    check_availability,
+    get_traffic,
+    get_backlinks,
+    logger,
+)
 
 st.title("Domain Checker 2.0")
 
@@ -19,6 +24,13 @@ if uploaded_file:
         traffic = get_traffic(domain)
         backlinks = get_backlinks(domain)
         available = check_availability(domain)
+        logger.info(
+            "Finished %s: available=%s, traffic=%s, backlinks=%s",
+            domain,
+            available,
+            traffic,
+            backlinks,
+        )
         results.append({
             "domain": domain,
             "available": available,
@@ -30,3 +42,4 @@ if uploaded_file:
     st.dataframe(result_df)
     csv = result_df.to_csv(index=False).encode("utf-8")
     st.download_button("Download Results CSV", data=csv, file_name="domain_results.csv", mime="text/csv")
+    logger.info("Completed processing %d domains", total)

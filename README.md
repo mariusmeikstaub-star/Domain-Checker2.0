@@ -26,3 +26,10 @@ versucht das Programm, alternative öffentliche Quellen zu nutzen
 (`data.similarweb.com` für Traffic bzw. `api.openlinkprofiler.org` für
 Backlinks). Erst wenn auch diese Abfragen fehlschlagen, wird für die
 jeweiligen Felder `N/A` zurückgegeben.
+
+## Logging
+
+Während der Verarbeitung schreibt die Anwendung Status- und Fehlermeldungen
+in die Datei `domain_checker.log`. Anhand dieser Logdatei lässt sich
+nachvollziehen, welche API-Aufrufe erfolgreich waren und wo eventuell
+Probleme auftraten.
