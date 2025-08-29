@@ -2,7 +2,6 @@ import json
 import logging
 import re
 
-import requests
 import whois
 import cloudscraper
 from bs4 import BeautifulSoup
