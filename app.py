@@ -1,0 +1,30 @@
+import streamlit as st
+import pandas as pd
+from domain_utils import check_availability, get_traffic, get_backlinks
+
+st.title("Domain Checker 2.0")
+
+uploaded_file = st.file_uploader("Upload CSV", type="csv")
+if uploaded_file:
+    df = pd.read_csv(uploaded_file, header=None, names=["domain"])
+    results = []
+    progress = st.progress(0)
+    status_placeholder = st.empty()
+    total = len(df)
+    for idx, row in df.iterrows():
+        domain = row["domain"].strip()
+        status_placeholder.text(f"Checking {idx+1}/{total}: {domain}")
+        available = check_availability(domain)
+        traffic = get_traffic(domain)
+        backlinks = get_backlinks(domain)
+        results.append({
+            "domain": domain,
+            "available": available,
+            "traffic": traffic,
+            "backlinks": backlinks,
+        })
+        progress.progress((idx+1)/total)
+    result_df = pd.DataFrame(results)
+    st.dataframe(result_df)
+    csv = result_df.to_csv(index=False).encode("utf-8")
+    st.download_button("Download Results CSV", data=csv, file_name="domain_results.csv", mime="text/csv")
