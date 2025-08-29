@@ -33,6 +33,31 @@ def check_availability(domain):
         logger.error("Error checking availability for %s: %s", domain, e)
         return True
 
+def _parse_number(value):
+    """Return ``value`` as ``float`` while respecting thousand separators.
+
+    The function removes grouping symbols (``.`` or ``,``) that are used as
+    thousand separators and normalises the decimal separator to ``.``. This
+    allows numbers such as ``"1.234,56"`` or ``"1,234.56"`` to be parsed
+    safely.
+    """
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    # Keep only digits and potential separators.
+    s = re.sub(r"[^0-9.,]", "", str(value))
+
+    # Remove thousand separators (a dot or comma followed by groups of three
+    # digits and then either another separator or the end of the string).
+    s = re.sub(r"(?<=\d)[.,](?=\d{3}(?:[.,]|$))", "", s)
+
+    # Convert a remaining comma to a decimal dot.
+    s = s.replace(",", ".")
+
+    return float(s)
+
+
 def _find_number(data, keys):
     """Return the first numeric value found for any of ``keys`` in ``data``."""
 
@@ -40,7 +65,7 @@ def _find_number(data, keys):
         for k, v in data.items():
             if k in keys and isinstance(v, (int, float, str)):
                 try:
-                    return float(str(v).replace(",", "").replace(".", ""))
+                    return _parse_number(v)
                 except ValueError:
                     pass
             result = _find_number(v, keys)
