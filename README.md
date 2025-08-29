@@ -6,11 +6,31 @@ Backlinks auf sie verweisen.
 
 ## Nutzung
 
-1. Erstellen Sie eine CSV-Datei mit einer Domain pro Zeile.
+1. Erstellen Sie eine CSV-Datei mit einer Domain pro Zeile. Optional kann die erste Zeile eine Kopfzeile `domain` enthalten.
 2. Doppelklicken Sie unter Windows auf `start.bat`.
 3. Laden Sie die CSV-Datei über die Benutzeroberfläche hoch.
 4. Warten Sie, bis alle Domains geprüft wurden. Der Fortschritt wird angezeigt.
 5. Laden Sie das Ergebnis als CSV-Datei herunter.
+
+## CSV-Format
+
+- Eine Domain pro Zeile
+- Optionale Kopfzeile `domain`
+
+Beispiel mit Kopfzeile:
+
+```
+domain
+example.com
+example.org
+```
+
+Beispiel ohne Kopfzeile:
+
+```
+example.com
+example.org
+```
 
 ## Datenquellen
 
