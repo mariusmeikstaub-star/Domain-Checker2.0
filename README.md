@@ -12,12 +12,17 @@ Backlinks auf sie verweisen.
 4. Warten Sie, bis alle Domains geprüft wurden. Der Fortschritt wird angezeigt.
 5. Laden Sie das Ergebnis als CSV-Datei herunter.
 
-## API-Keys
+## API-Keys und Fallbacks
 
-Für die Abfragen von Traffic und Backlinks werden API-Schlüssel erwartet.
-Setzen Sie vor dem Start folgende Umgebungsvariablen, falls verfügbar:
+Für die Abfragen von Traffic und Backlinks werden nach Möglichkeit
+API-Schlüssel verwendet. Setzen Sie vor dem Start folgende
+Umgebungsvariablen, falls verfügbar:
 
-* `SIMILARWEB_API_KEY` – Traffic-Abfrage
+* `SIMILARWEB_API_KEY` – Traffic-Abfrage über die SimilarWeb-API
 * `OPR_API_KEY` – Backlink-Abfrage über [Open Page Rank](https://www.openpagerank.com/)
 
-Sind keine API-Schlüssel gesetzt oder sind keine Daten verfügbar, werden für die jeweiligen Felder `N/A` zurückgegeben.
+Sind keine API-Schlüssel gesetzt oder liefern die APIs keine Daten,
+versucht das Programm, alternative öffentliche Quellen zu nutzen
+(`data.similarweb.com` für Traffic bzw. `api.openlinkprofiler.org` für
+Backlinks). Erst wenn auch diese Abfragen fehlschlagen, wird für die
+jeweiligen Felder `N/A` zurückgegeben.
