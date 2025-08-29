@@ -3,3 +3,4 @@ pandas
 python-whois
 requests
 beautifulsoup4
+cloudscraper

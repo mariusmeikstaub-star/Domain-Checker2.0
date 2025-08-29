@@ -17,7 +17,8 @@ Backlinks auf sie verweisen.
 Traffic- und Backlinkwerte werden automatisch aus frei zugänglichen
 Webseiten ermittelt – es sind keine API-Schlüssel notwendig. Für jede
 Domain wird die entsprechende SimilarWeb- und OpenLinkProfiler-Seite
-abgerufen und der dort angezeigte Wert ausgelesen. Kann ein Wert nicht
+über [cloudscraper](https://pypi.org/project/cloudscraper/) abgerufen
+und der dort angezeigte Wert ausgelesen. Kann ein Wert nicht
 ermittelt werden, erscheint `N/A`.
 
 ## Logging

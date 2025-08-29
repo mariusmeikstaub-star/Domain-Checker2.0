@@ -4,6 +4,7 @@ import re
 
 import requests
 import whois
+import cloudscraper
 from bs4 import BeautifulSoup
 from whois.parser import PywhoisError
 
@@ -64,7 +65,8 @@ def get_traffic(domain):
     url = f"https://www.similarweb.com/website/{domain}/"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        r = requests.get(url, headers=headers, timeout=10)
+        scraper = cloudscraper.create_scraper()
+        r = scraper.get(url, headers=headers, timeout=10)
         logger.info("SimilarWeb HTML response for %s: %s", domain, r.status_code)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
@@ -95,7 +97,8 @@ def get_backlinks(domain):
     url = f"https://openlinkprofiler.org/r/{domain}"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        r = requests.get(url, headers=headers, timeout=10)
+        scraper = cloudscraper.create_scraper()
+        r = scraper.get(url, headers=headers, timeout=10)
         logger.info("OpenLinkProfiler HTML response for %s: %s", domain, r.status_code)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
