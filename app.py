@@ -11,9 +11,9 @@ if uploaded_file:
     progress = st.progress(0)
     status_placeholder = st.empty()
     total = len(df)
-    for idx, row in df.iterrows():
-        domain = row["domain"].strip()
-        status_placeholder.text(f"Checking {idx+1}/{total}: {domain}")
+    for idx, row in enumerate(df.itertuples(), start=1):
+        domain = row.domain.strip()
+        status_placeholder.text(f"Checking {idx}/{total}: {domain}")
         available = check_availability(domain)
         traffic = get_traffic(domain)
         backlinks = get_backlinks(domain)
@@ -23,7 +23,7 @@ if uploaded_file:
             "traffic": traffic,
             "backlinks": backlinks,
         })
-        progress.progress((idx+1)/total)
+        progress.progress(idx/total)
     result_df = pd.DataFrame(results)
     st.dataframe(result_df)
     csv = result_df.to_csv(index=False).encode("utf-8")
