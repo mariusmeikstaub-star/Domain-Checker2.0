@@ -27,16 +27,24 @@ if uploaded_file:
     total = len(df)
     for idx, domain in enumerate(df["domain"], start=1):
         status_placeholder.text(f"Checking {idx}/{total}: {domain}")
-        # Always collect traffic and backlink data, even if the domain is already registered.
-        traffic = get_traffic(domain)
-        backlinks = get_backlinks(domain)
+
+        # Determine availability first.  Free domains should not have any
+        # measurable traffic or backlinks, so we avoid querying external
+        # services for them.
         available = check_availability(domain)
         if available is None:
             availability_status = "unbekannt"
+            traffic = 0
+            backlinks = 0
         elif available:
             availability_status = "frei"
+            traffic = 0
+            backlinks = 0
         else:
             availability_status = "vergeben"
+            traffic = get_traffic(domain)
+            backlinks = get_backlinks(domain)
+
         logger.info(
             "Finished %s: available=%s, traffic=%s, backlinks=%s",
             domain,
