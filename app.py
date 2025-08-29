@@ -21,6 +21,7 @@ if uploaded_file:
     total = len(df)
     for idx, domain in enumerate(df["domain"], start=1):
         status_placeholder.text(f"Checking {idx}/{total}: {domain}")
+        # Always collect traffic and backlink data, even if the domain is already registered.
         traffic = get_traffic(domain)
         backlinks = get_backlinks(domain)
         available = check_availability(domain)
