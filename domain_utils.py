@@ -12,7 +12,7 @@ def check_availability(domain):
 def get_traffic(domain):
     api_key = os.getenv("SIMILARWEB_API_KEY")
     if not api_key:
-        return None
+        return "N/A"
     url = f"https://api.similarweb.com/v1/website/{domain}/traffic-and-engagement/visits?api_key={api_key}&country=world"
     try:
         r = requests.get(url, timeout=10)
@@ -21,14 +21,14 @@ def get_traffic(domain):
         visits = data.get("visits")
         if isinstance(visits, dict):
             return sum(visits.values())
-        return None
+        return "N/A"
     except Exception:
-        return None
+        return "N/A"
 
 def get_backlinks(domain):
     api_key = os.getenv("OPR_API_KEY")
     if not api_key:
-        return None
+        return "N/A"
     url = f"https://openpagerank.com/api/v1.0/getPageRank?domains%5B0%5D={domain}"
     headers = {"API-OPR": api_key}
     try:
@@ -38,6 +38,6 @@ def get_backlinks(domain):
         response = data.get("response", [])
         if response:
             return response[0].get("referring_domains")
-        return None
+        return "N/A"
     except Exception:
-        return None
+        return "N/A"
